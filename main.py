@@ -12,15 +12,16 @@ SECTORS = [
     "Capital Goods", "Metals", "Oil & Gas", "Power", "Telecom", "Consumer Durables"
 ]
 
-def generate_synthetic_universe(num_companies: int = 100, year: int = 2024) -> pd.DataFrame:
-    """Generates a synthetic universe of NIFTY 100 companies with financial metrics."""
+def generate_synthetic_universe(num_companies: int = 100, year: int = 2024):
+    """Generates a synthetic universe of NIFTY 100 companies and peer group mappings."""
     np.random.seed(42)
     company_ids = [f"COMP_{i:03d}" for i in range(1, num_companies + 1)]
+    sectors = [np.random.choice(SECTORS) for _ in range(num_companies)]
     
     data = {
         "company_id": company_ids,
         "company_name": [f"Company {i}" for i in range(1, num_companies + 1)],
-        "broad_sector": [np.random.choice(SECTORS) for _ in range(num_companies)],
+        "broad_sector": sectors,
         "market_cap_cr": np.random.uniform(10000, 500000, num_companies).round(2),
         "sales_cr": np.random.uniform(1000, 100000, num_companies).round(2),
         "return_on_equity_pct": np.random.uniform(2, 35, num_companies).round(2),
@@ -41,12 +42,18 @@ def generate_synthetic_universe(num_companies: int = 100, year: int = 2024) -> p
     }
     df = pd.DataFrame(data)
     
+    peer_groups_df = pd.DataFrame({
+        "company_id": company_ids,
+        "peer_group_name": sectors
+    })
+    
     os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect("data/n100_platform.db")
     df.to_sql("financial_ratios", conn, if_exists="replace", index=False)
+    peer_groups_df.to_sql("peer_groups", conn, if_exists="replace", index=False)
     conn.close()
     
-    return df
+    return df, peer_groups_df
 
 def main():
     print("--- Running N100 Financial Intelligence Platform (Sprint 3) ---")
@@ -56,9 +63,9 @@ def main():
     try:
         df = pd.read_sql_query("SELECT * FROM financial_ratios WHERE year = 2024", conn)
         if df.empty:
-            df = generate_synthetic_universe()
+            df, _ = generate_synthetic_universe()
     except Exception:
-        df = generate_synthetic_universe()
+        df, _ = generate_synthetic_universe()
     finally:
         conn.close()
         
